@@ -17,6 +17,7 @@
 
 class GuiFeatureBase;
 class PlayerRenamer;
+class PlayerTitleChanger;
 class BallHiderAndDecals;
 class StadiumManager;
 class CameraSettingsOverride;
@@ -59,6 +60,7 @@ public:
 
     [[nodiscard]] PriData* GetPriData(PriWrapper& pri);
     void OnPriLoadoutSet(PriWrapper& pri);
+    void ApplyLoadoutOverrides(PriWrapper& pri);
     void RefreshPriData();
     [[nodiscard]] PriWrapper GetPriWrapper(const PriData& pri_data) const;
     void UpdateLoadout(const PriData& pri_data) const;
@@ -111,6 +113,7 @@ private:
     std::shared_ptr<StadiumManager> stadium_manager_;
     std::shared_ptr<BallHiderAndDecals> ball_hider_;
     std::shared_ptr<PlayerRenamer> player_rename_;
+    std::shared_ptr<PlayerTitleChanger> player_title_;
     std::shared_ptr<ReplayManager> replay_manager_;
     std::shared_ptr<TextureCache> texture_cache_;
     std::shared_ptr<CamPathsManager> dollycam_manager_;

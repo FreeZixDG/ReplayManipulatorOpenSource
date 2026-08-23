@@ -6,6 +6,7 @@
 - Apply custom decals to cars (using the AlphaConsole folder and format for this)
 - Add custom paint colors to items 
 - Rename any player in a replay
+- Change the player title shown for any player in a replay
 - Change player camera settings
 - Fixes issues with camera transitions when using slowmotion
 - View and open all your saved replays from the settings menu

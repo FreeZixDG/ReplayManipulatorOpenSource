@@ -123,6 +123,9 @@
     <ClCompile Include="Features\Names\PlayerRenamer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Features\Names\PlayerTitleChanger.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="Features\CamPathsManager\CamPathsManager.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -258,6 +261,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Features\Names\PlayerRenamer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Features\Names\PlayerTitleChanger.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Features\CamPathsManager\CamPathsManager.h">

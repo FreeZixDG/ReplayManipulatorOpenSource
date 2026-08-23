@@ -19,6 +19,7 @@
 #include "Features/Items/PaintFinishColors.h"
 #include "Features/MapChange/ReplayMapChanger.h"
 #include "Features/Names/PlayerRenamer.h"
+#include "Features/Names/PlayerTitleChanger.h"
 #include "Features/ReplayManager/ReplayManager.h"
 #include "Features/SlowMotionTransitionFixer/Stfu.h"
 #include "Features/StadiumColors/StadiumManager.h"
@@ -45,6 +46,7 @@ void ReplayManipulatorOpenSource::onLoad()
     auto custom_ball_decals_folder = gameWrapper->GetDataFolder() / "acplugin" / "BallTextures";
     ball_hider_ = CreateModule<BallHiderAndDecals>(gameWrapper, texture_cache_, custom_ball_decals_folder);
     player_rename_ = std::make_shared<PlayerRenamer>(gameWrapper);
+    player_title_ = std::make_shared<PlayerTitleChanger>(gameWrapper);
     dollycam_manager_ = CreateModule<CamPathsManager>(gameWrapper, cvarManager,
                                                       gameWrapper->GetDataFolder() / "campaths");
     credits_ = CreateModule<CreditsInSettings>(gameWrapper);
@@ -106,6 +108,8 @@ void ReplayManipulatorOpenSource::OnReplayOpen()
         LOG("Loading replay with ID: {}", replay_id);
         replay_players_.clear();
         replay_players_originals_.clear();
+        player_rename_->ResetNameOverrides();
+        player_title_->ResetTitleOverrides();
     }
     current_replay_id_ = replay_id;
     current_replay_name_ = replay.GetReplayName().ToString();
@@ -217,6 +221,79 @@ void ReplayManipulatorOpenSource::DrawPriData(PriData& pri)
                 gameWrapper->Execute([this, pri](...) {
                     auto pri_wrapper = GetPriWrapper(pri);
                     player_rename_->Restore(pri_wrapper);
+                });
+            }
+        }
+    }
+
+    if (player_title_ && !player_title_->IsUsable())
+    {
+        ImGui::TextUnformatted("Title editing is unavailable on this Rocket League build");
+        ImGui::SameLine();
+        HelpMarker("The game stores the player title in a field the BakkesMod SDK does not "
+                   "expose, so the plugin reads it at a hard-coded offset. That offset no "
+                   "longer matches this build of Rocket League, so title editing turned itself "
+                   "off rather than write to the wrong place. See the BakkesMod console (F6) "
+                   "for the details.");
+    }
+    else if (player_title_)
+    {
+        const auto current_title = player_title_->GetDisplayedTitleId(pri.uid);
+        ImGui::Text("Current title: %s", current_title.empty() ? "(none)" : current_title.c_str());
+        ImGui::SameLine();
+        HelpMarker("Rocket League identifies a title by an internal id, not by the text you see "
+                   "on the scoreboard. There is no way to list every id the game knows, so the "
+                   "dropdown only offers ids seen on players in the replays you have opened. "
+                   "Open a replay containing a player who has the title you want, and its id "
+                   "shows up here.");
+
+        static std::string new_title_id;
+        ImGui::SetNextItemWidth(200);
+        ImGui::InputText("Title id", &new_title_id);
+
+        const auto& known_ids = player_title_->GetKnownTitleIds();
+        if (!known_ids.empty())
+        {
+            ImGui::SetNextItemWidth(200);
+            if (ImGui::BeginCombo("Title ids seen so far", "Pick one"))
+            {
+                for (const auto& known_id : known_ids)
+                {
+                    if (ImGui::Selectable(known_id.c_str(), known_id == new_title_id))
+                    {
+                        new_title_id = known_id;
+                    }
+                }
+                ImGui::EndCombo();
+            }
+        }
+
+        {
+            ImGui::Disable const disable_if_no_title{new_title_id.empty()};
+            if (ImGui::Button("Change the title"))
+            {
+                gameWrapper->Execute([this, pri, title_id = new_title_id](...) {
+                    auto pri_wrapper = GetPriWrapper(pri);
+                    player_title_->SetTitle(pri_wrapper, title_id);
+                });
+            }
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Remove the title"))
+        {
+            gameWrapper->Execute([this, pri](...) {
+                auto pri_wrapper = GetPriWrapper(pri);
+                player_title_->SetTitle(pri_wrapper, {});
+            });
+        }
+        {
+            ImGui::Disable const disable_if_not_changed{!player_title_->IsInTitleCache(pri.uid)};
+            ImGui::SameLine();
+            if (ImGui::Button("Restore##title"))
+            {
+                gameWrapper->Execute([this, pri](...) {
+                    auto pri_wrapper = GetPriWrapper(pri);
+                    player_title_->Restore(pri_wrapper);
                 });
             }
         }
@@ -388,6 +465,16 @@ void ReplayManipulatorOpenSource::OnPriLoadoutSet(PriWrapper& pri)
         return;
     }
 
+    ApplyLoadoutOverrides(pri);
+
+    // The title lives in the loadout, so anything that writes a loadout wipes our override:
+    // the game when scrubbing the timeline, but also ApplyLoadoutOverrides above. It has to
+    // run last, which is why it sits here instead of inside ApplyLoadoutOverrides.
+    player_title_->ObserveAndReapply(pri);
+}
+
+void ReplayManipulatorOpenSource::ApplyLoadoutOverrides(PriWrapper& pri)
+{
     auto car = pri.GetCar();
     //if no car they're spectating. Don't care about those
     if (!car)
@@ -443,6 +530,7 @@ void ReplayManipulatorOpenSource::RefreshPriData()
 
     for (auto pri : pris)
     {
+        player_title_->ObserveAndReapply(pri);
         auto loadout = LoadoutUtilities::GetLoadoutFromPri(pri, pri.GetTeamNum2());
         if (!loadout)
             continue;

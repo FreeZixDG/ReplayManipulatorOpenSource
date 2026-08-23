@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Release|x64">
@@ -113,6 +113,7 @@
     <ClCompile Include="Framework\EventDispatcher\ScopedBMEventDispatcher.cpp" />
     <ClCompile Include="Framework\GuiFeatureBase.cpp" />
     <ClCompile Include="Features\Names\PlayerRenamer.cpp" />
+    <ClCompile Include="Features\Names\PlayerTitleChanger.cpp" />
     <ClCompile Include="Features\ReplayManager\ReplayData.cpp" />
     <ClCompile Include="Features\ReplayManager\ReplayManager.cpp" />
     <ClCompile Include="Features\TextureCache.cpp" />
@@ -158,6 +159,7 @@
     <ClInclude Include="Framework\EventDispatcher\ScopedBMEventDispatcher.h" />
     <ClInclude Include="Framework\GuiFeatureBase.h" />
     <ClInclude Include="Features\Names\PlayerRenamer.h" />
+    <ClInclude Include="Features\Names\PlayerTitleChanger.h" />
     <ClInclude Include="Features\ReplayManager\ReplayData.h" />
     <ClInclude Include="Features\ReplayManager\ReplayManager.h" />
     <ClInclude Include="Features\TextureCache.h" />
