@@ -3,8 +3,6 @@
 
 #include <cstdint>
 
-#include "Framework/StateLock.h"
-
 namespace
 {
 // TAGame.PRI_TA.Title -- the FName the game resolves against TitleConfig_X to get the text
@@ -73,7 +71,6 @@ PlayerTitleChanger::PlayerTitleChanger(std::shared_ptr<GameWrapper> gw)
 
 void PlayerTitleChanger::SetTitle(PriWrapper pri, const std::string& title_id)
 {
-    StateLock const lock;
     if (!CanChangeTitle())
     {
         LOG("player title changer is disabled");
@@ -99,14 +96,9 @@ void PlayerTitleChanger::SetTitle(PriWrapper pri, const std::string& title_id)
 
 void PlayerTitleChanger::Restore(PriWrapper pri)
 {
-    StateLock const lock;
     if (!CanChangeTitle())
     {
         LOG("player title changer is disabled");
-        return;
-    }
-    if (!pri)
-    {
         return;
     }
     const auto id = PriUid(pri);
@@ -121,7 +113,6 @@ void PlayerTitleChanger::Restore(PriWrapper pri)
 
 void PlayerTitleChanger::ResetTitleOverrides()
 {
-    StateLock const lock;
     title_cache_.clear();
     observed_titles_.clear();
     // known_title_ids_ is deliberately kept: ids collected from earlier replays are the only
@@ -131,9 +122,6 @@ void PlayerTitleChanger::ResetTitleOverrides()
 
 void PlayerTitleChanger::ObserveAndReapply(PriWrapper& pri)
 {
-    // Fires in bursts from the loadout hooks during a seek, and Remember below writes the
-    // caches the UI reads on the render thread.
-    StateLock const lock;
     if (applying_ || !enabled_ || !pri)
     {
         return;
@@ -164,15 +152,7 @@ void PlayerTitleChanger::ObserveAndReapply(PriWrapper& pri)
 
 bool PlayerTitleChanger::IsInTitleCache(const PriUid& pri_id) const
 {
-    StateLock const lock;
     return title_cache_.contains(pri_id);
-}
-
-
-bool PlayerTitleChanger::IsUsable() const
-{
-    StateLock const lock;
-    return enabled_;
 }
 
 
@@ -184,7 +164,6 @@ bool PlayerTitleChanger::CanChangeTitle() const
 
 std::string PlayerTitleChanger::GetDisplayedTitleId(const PriUid& pri_id) const
 {
-    StateLock const lock;
     if (const auto p = title_cache_.find(pri_id); p != title_cache_.end())
     {
         return p->second.new_title_id;
@@ -194,13 +173,6 @@ std::string PlayerTitleChanger::GetDisplayedTitleId(const PriUid& pri_id) const
         return p->second;
     }
     return {};
-}
-
-
-std::set<std::string> PlayerTitleChanger::GetKnownTitleIds() const
-{
-    StateLock const lock;
-    return known_title_ids_;
 }
 
 

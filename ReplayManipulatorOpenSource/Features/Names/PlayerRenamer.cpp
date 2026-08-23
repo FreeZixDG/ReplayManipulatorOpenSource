@@ -1,7 +1,6 @@
 #include "pch.h"
 #include "PlayerRenamer.h"
 
-#include "Framework/StateLock.h"
 #include "bakkesmod/wrappers/ReplayServerWrapper.h"
 
 namespace
@@ -16,9 +15,6 @@ PlayerRenamer::PlayerRenamer(std::shared_ptr<GameWrapper> gw)
     : gw_(std::move(gw))
 {
     gw_->HookEventPost("Function TAGame.GFxNameplatesManager_TA.Update", [this](...) {
-        // Taken once for the whole sweep rather than per player: the UI reads name_cache_
-        // from the render thread while Rename/Restore write it.
-        StateLock const lock;
         if (name_cache_.empty())
             return;
 
@@ -44,7 +40,6 @@ void PlayerRenamer::DoRename(PriWrapper pri, const std::string& new_name)
 
 void PlayerRenamer::Rename(PriWrapper pri, const std::string& new_name)
 {
-    StateLock const lock;
     if (!CanRename())
     {
         LOG("player renamer is disabled");
@@ -72,14 +67,9 @@ void PlayerRenamer::Rename(PriWrapper pri, const std::string& new_name)
 
 void PlayerRenamer::Restore(PriWrapper pri)
 {
-    StateLock const lock;
     if (!CanRename())
     {
         LOG("player renamer is disabled");
-        return;
-    }
-    if (!pri)
-    {
         return;
     }
     const auto id = PriUid(pri);
@@ -95,14 +85,12 @@ void PlayerRenamer::Restore(PriWrapper pri)
 
 bool PlayerRenamer::IsInRenameCache(const PriUid& pri_id) const
 {
-    StateLock const lock;
     return name_cache_.contains(pri_id);
 }
 
 
 void PlayerRenamer::ResetNameOverrides()
 {
-    StateLock const lock;
     name_cache_.clear();
     last_replay_frame_ = -1;
     seek_settle_frames_ = 0;

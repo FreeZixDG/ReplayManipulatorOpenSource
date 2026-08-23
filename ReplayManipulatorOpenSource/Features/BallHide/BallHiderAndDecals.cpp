@@ -1,8 +1,6 @@
 ﻿#include "pch.h"
 #include "BallHiderAndDecals.h"
 
-#include "Framework/StateLock.h"
-
 
 BallHiderAndDecals::BallHiderAndDecals(std::shared_ptr<GameWrapper> gw, std::shared_ptr<TextureCache> texture_cache, std::filesystem::path custom_decal_folder)
     : GuiFeatureBase(std::move(gw), "Ball Hider", DefaultVisibility::kWindow),
@@ -20,7 +18,6 @@ BallHiderAndDecals::BallHiderAndDecals(std::shared_ptr<GameWrapper> gw, std::sha
 
 void BallHiderAndDecals::SetBallHidden(const bool hide)
 {
-    StateLock const lock;
     auto ball = GetBallWrapper();
     if (ball.IsNull())
     {
@@ -44,7 +41,6 @@ void BallHiderAndDecals::FadeOutBall() const
 
 void BallHiderAndDecals::FadeInBall()
 {
-    StateLock const lock;
     auto ball = GetBallWrapper();
     if (!ball)
     {
@@ -60,7 +56,6 @@ void BallHiderAndDecals::FadeInBall()
 
 CustomBallDecal& BallHiderAndDecals::GetCustomDecal(const std::string& decal_name)
 {
-    StateLock const lock;
     if (const auto it = loaded_custom_decals_.find(decal_name); it == loaded_custom_decals_.end())
     {
         const auto it2 = custom_decal_configs_.find(decal_name);
@@ -77,7 +72,6 @@ CustomBallDecal& BallHiderAndDecals::GetCustomDecal(const std::string& decal_nam
 
 void BallHiderAndDecals::Render()
 {
-    StateLock const lock;
     if (ImGui::Checkbox("Hidden", &ball_hidden_))
     {
         OnGameThread([this] {
@@ -122,16 +116,10 @@ void BallHiderAndDecals::Render()
 }
 
 
-// Reachable from both threads: from Render on the render thread, and from FadeInBall and the
-// EventGameEventSet timeout on the game thread.
 void BallHiderAndDecals::SetBallDecal(const std::string& name)
 {
-    {
-        StateLock const lock;
-        custom_ball_decal_ = name;
-    }
+    custom_ball_decal_ = name;
     OnGameThread([this]() {
-        StateLock const lock;
         if (auto the_ball = GetBallWrapper())
         {
             CustomTextures::ApplyTextureToBall(GetCustomDecal(custom_ball_decal_), the_ball);
@@ -177,14 +165,9 @@ BallWrapper BallHiderAndDecals::GetBallWrapper() const
 void BallHiderAndDecals::OnBallGameEventSet()
 {
     gw_->SetTimeout([this](...) {
-        std::string decal;
+        if (!custom_ball_decal_.empty())
         {
-            StateLock const lock;
-            decal = custom_ball_decal_;
-        }
-        if (!decal.empty())
-        {
-            SetBallDecal(decal);
+            SetBallDecal(custom_ball_decal_);
         }
     }, 1);
 }

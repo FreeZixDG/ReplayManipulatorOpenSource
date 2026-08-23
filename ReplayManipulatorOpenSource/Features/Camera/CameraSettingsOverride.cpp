@@ -2,7 +2,6 @@
 #include "CameraSettingsOverride.h"
 
 #include "ImguiUtils.h"
-#include "Framework/StateLock.h"
 #include "bakkesmod/wrappers/GameObject/CameraSettingsActorWrapper.h"
 
 ProfileCameraSettings CameraOverride::GetCameraSettings() const
@@ -41,16 +40,12 @@ CameraSettingsOverride::CameraSettingsOverride(std::shared_ptr<GameWrapper> gw)
                                                });
 
     gw_->HookEvent("Function TAGame.GFxHUD_Replay_TA.Destroyed", [this](...) {
-        StateLock const lock;
         camera_overrides_.clear();
     });
 }
 
-// Called every frame from the UI on the render thread, while OnPersistentCameraSet inserts
-// into the same map on the game thread. An insert that rehashes under this find is a crash.
 CameraOverride CameraSettingsOverride::GetCameraOverrideSettings(const PriUid& id) const
 {
-    StateLock const lock;
     if (const auto it = camera_overrides_.find(id); it != camera_overrides_.end())
     {
         return it->second;
@@ -60,7 +55,6 @@ CameraOverride CameraSettingsOverride::GetCameraOverrideSettings(const PriUid& i
 
 void CameraSettingsOverride::SetCameraOverrideSettings(const PriUid& id, const CameraOverride& camera_override_settings)
 {
-    StateLock const lock;
     if (const auto it = camera_overrides_.find(id); it != camera_overrides_.end())
     {
         it->second = camera_override_settings;
@@ -110,7 +104,6 @@ bool CameraSettingsOverride::RenderCameraOverride(CameraOverride& camera_overrid
 
 void CameraSettingsOverride::OnPersistentCameraSet(const CameraSettingsActorWrapper& camera_settings)
 {
-    StateLock const lock;
     auto pri = camera_settings.GetPri();
     if (!pri)
     {

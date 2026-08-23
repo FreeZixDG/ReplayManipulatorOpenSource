@@ -1,6 +1,5 @@
 ﻿#include "pch.h"
 #include "ReplayMapChanger.h"
-#include "Framework/StateLock.h"
 #include "bakkesmod/wrappers/GameObject/ReplayManagerWrapper.h"
 #include "bakkesmod/wrappers/GameObject/MapListWrapper.h"
 #include "bakkesmod/wrappers/GameObject/MapDataWrapper.h"
@@ -76,11 +75,8 @@ void ReplayMapChanger::ChangeMap(const Map& map) const
     replay_manager.PlayReplay(replay_wrapper, map.name, current_time);
 }
 
-// Game thread, from OnReplayOpen. current_map_ holds two std::strings that Render reads on
-// the render thread.
 void ReplayMapChanger::UpdateCurrentMap()
 {
-    StateLock const lock;
     auto current_map_name = gw_->GetCurrentMap();
     auto it = std::ranges::find_if(all_maps_, [current_map_name](const Map& map) {
         return map.name == current_map_name;
@@ -97,7 +93,6 @@ void ReplayMapChanger::UpdateCurrentMap()
 
 void ReplayMapChanger::Render()
 {
-    StateLock const lock;
     static Map map;
     if (DrawImGuiMapSelector(map))
     {

@@ -112,7 +112,6 @@
     <ClCompile Include="Framework\EventDispatcher\BmAdapter.cpp" />
     <ClCompile Include="Framework\EventDispatcher\ScopedBMEventDispatcher.cpp" />
     <ClCompile Include="Framework\GuiFeatureBase.cpp" />
-    <ClCompile Include="Framework\StateLock.cpp" />
     <ClCompile Include="Features\Names\PlayerRenamer.cpp" />
     <ClCompile Include="Features\Names\PlayerTitleChanger.cpp" />
     <ClCompile Include="Features\ReplayManager\ReplayData.cpp" />
@@ -159,7 +158,6 @@
     <ClInclude Include="Framework\EventDispatcher\BmAdapter.h" />
     <ClInclude Include="Framework\EventDispatcher\ScopedBMEventDispatcher.h" />
     <ClInclude Include="Framework\GuiFeatureBase.h" />
-    <ClInclude Include="Framework\StateLock.h" />
     <ClInclude Include="Features\Names\PlayerRenamer.h" />
     <ClInclude Include="Features\Names\PlayerTitleChanger.h" />
     <ClInclude Include="Features\ReplayManager\ReplayData.h" />
