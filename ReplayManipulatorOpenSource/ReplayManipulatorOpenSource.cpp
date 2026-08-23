@@ -24,6 +24,7 @@
 #include "Features/SlowMotionTransitionFixer/Stfu.h"
 #include "Features/StadiumColors/StadiumManager.h"
 #include "Framework/GuiFeatureBase.h"
+#include "Framework/StateLock.h"
 
 BAKKESMOD_PLUGIN(ReplayManipulatorOpenSource, "write a plugin description here", plugin_version, PLUGINTYPE_FREEPLAY)
 
@@ -87,6 +88,7 @@ void ReplayManipulatorOpenSource::InitUtilityModules()
 
 void ReplayManipulatorOpenSource::OnReplayOpen()
 {
+    StateLock const lock;
     auto game_event = gameWrapper->GetGameEventAsReplay();
     if (!game_event)
     {
@@ -174,6 +176,9 @@ void ReplayManipulatorOpenSource::OnGameThread(std::function<void()>&& func) con
 
 void ReplayManipulatorOpenSource::RenderSettings()
 {
+    // Render thread. Held for the whole frame so the game thread cannot reshape anything the
+    // widgets below are walking. See StateLock.h.
+    StateLock const lock;
     if (ImGui::Button("open window"))
     {
         OnGameThread([this] {
@@ -251,7 +256,7 @@ void ReplayManipulatorOpenSource::DrawPriData(PriData& pri)
         ImGui::SetNextItemWidth(200);
         ImGui::InputText("Title id", &new_title_id);
 
-        const auto& known_ids = player_title_->GetKnownTitleIds();
+        const auto known_ids = player_title_->GetKnownTitleIds();
         if (!known_ids.empty())
         {
             ImGui::SetNextItemWidth(200);
@@ -339,8 +344,11 @@ void ReplayManipulatorOpenSource::DrawPriData(PriData& pri)
                 int& skin_id = pri.loadout.items[pluginsdk::Equipslot::DECAL].product_id;
                 if (body_id == pri.custom_decal.BodyID && skin_id == pri.custom_decal.SkinID)
                 {
-                    OnGameThread([this, &pri] {
-                        ApplyDecal(pri);
+                    // By value: a reference would aim into replay_players_, and the lambda
+                    // runs later on the game thread, by which time the vector may have been
+                    // re-sorted or grown.
+                    OnGameThread([this, pri_data = pri] {
+                        ApplyDecal(pri_data);
                     });
                 }
                 else
@@ -394,6 +402,10 @@ void ReplayManipulatorOpenSource::DrawPriData(PriData& pri)
 
 void ReplayManipulatorOpenSource::RenderWindow()
 {
+    // Render thread. Held for the whole frame: DrawPriData below writes straight into
+    // replay_players_ elements (the loadout editor even inserts map nodes on a plain draw)
+    // while the loadout hooks read them on the game thread. See StateLock.h.
+    StateLock const lock;
     ImGuiTabBarFlags constexpr tab_bar_flags = ImGuiTabBarFlags_None;
     if (ImGui::BeginTabBar("Players", tab_bar_flags))
     {
@@ -445,6 +457,8 @@ void ReplayManipulatorOpenSource::RenderWindow()
     }
 }
 
+// The returned pointer aims into replay_players_, so it is only good for as long as the
+// caller holds a StateLock. Every caller does.
 PriData* ReplayManipulatorOpenSource::GetPriData(PriWrapper& pri)
 {
     const auto it = std::ranges::find_if(replay_players_, [pri](const PriData& p)mutable {
@@ -460,6 +474,7 @@ PriData* ReplayManipulatorOpenSource::GetPriData(PriWrapper& pri)
 
 void ReplayManipulatorOpenSource::OnPriLoadoutSet(PriWrapper& pri)
 {
+    StateLock const lock;
     if (!pri)
     {
         return;
@@ -506,6 +521,8 @@ void ReplayManipulatorOpenSource::ApplyLoadoutOverrides(PriWrapper& pri)
 
 void ReplayManipulatorOpenSource::RefreshPriData()
 {
+    // Appends to and sorts replay_players_, which moves elements the UI holds references to.
+    StateLock const lock;
     auto game_event = gameWrapper->GetGameEventAsReplay();
     if (!game_event)
     {
@@ -652,6 +669,7 @@ void ReplayManipulatorOpenSource::ApplyCarHiddenState(const PriData& pri_data) c
 
 void ReplayManipulatorOpenSource::OnMaterialInit(const CarMeshComponentBaseWrapper& car_mesh_component)
 {
+    StateLock const lock;
     auto car = car_mesh_component.GetCar();
     if (!car)
     {
@@ -672,6 +690,7 @@ void ReplayManipulatorOpenSource::OnMaterialInit(const CarMeshComponentBaseWrapp
 
 void ReplayManipulatorOpenSource::OnSetMeshMaterialColors(CarWrapper& car_wrapper)
 {
+    StateLock const lock;
     if (!car_wrapper)
         return;
 

@@ -37,13 +37,16 @@ public:
     [[nodiscard]] bool IsInTitleCache(const PriUid& pri_id) const;
     [[nodiscard]] bool CanChangeTitle() const;
     /// False once the raw offset has been found to no longer match this Rocket League build.
-    [[nodiscard]] bool IsUsable() const { return enabled_; }
+    [[nodiscard]] bool IsUsable() const;
 
-    // The two below only read cached state, so they are safe to call from the render thread.
+    // The three below are the render thread's view of this feature. They read cached state
+    // that ObserveAndReapply writes from the game thread, so they take a StateLock.
     [[nodiscard]] std::string GetDisplayedTitleId(const PriUid& pri_id) const;
     /// Every distinct title id seen on a player so far. There is no way to enumerate the
     /// game's full title list, so this is how the user discovers ids that actually exist.
-    [[nodiscard]] const std::set<std::string>& GetKnownTitleIds() const { return known_title_ids_; }
+    /// Returned by value: a reference would let the caller walk the set after dropping the
+    /// lock, which is exactly the crash this is meant to prevent.
+    [[nodiscard]] std::set<std::string> GetKnownTitleIds() const;
 
 private:
     [[nodiscard]] bool DoSetTitle(PriWrapper pri, const std::string& title_id);

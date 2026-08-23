@@ -118,6 +118,11 @@ void ReplayManager::SetLoadedReplays(std::vector<ReplaySoccarWrapper>& replay_wr
 
 void ReplayManager::Render()
 {
+    // Locked before the emptiness test, not after: SetLoadedReplays move-assigns replays_
+    // from the ReplayManager_TA.Tick hook on the game thread, so reading size() outside the
+    // lock can catch the vector mid-swap.
+    std::scoped_lock const lock(replays_mutex_);
+
     if (replays_.empty())
     {
         if (ImGui::Button("Load demo folder"))
@@ -128,7 +133,6 @@ void ReplayManager::Render()
         }
         return;
     }
-    std::scoped_lock const lock(replays_mutex_);
 
     static std::string search;
     ImGui::InputText("Filter by name", &search);

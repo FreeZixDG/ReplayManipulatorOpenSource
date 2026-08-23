@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "StadiumManager.h"
 #include "ImguiUtils.h"
+#include "Framework/StateLock.h"
 #include "bakkesmod/wrappers/PluginManagerWrapper.h"
 #include <utility>
 
@@ -64,6 +65,7 @@ void StadiumManager::DrawInstallGui()
                 cvar_manager_->executeCommand("plugin load colorchanger");
                 if (IsColorChangerInstalled())
                 {
+                    StateLock const lock;
                     plugin_installed_ = true;
                 }
             },
@@ -116,9 +118,12 @@ bool StadiumManager::GetEnabled() const
     return GetCvarBoolValue(CvarNames::enabled);
 }
 
+// Game thread, from the SetBooleanValue hook. Render reads the flag on the render thread.
 void StadiumManager::RecheckForcedColors()
 {
-    force_default_colors_ = GetForceDefaultColors();
+    const auto forced = GetForceDefaultColors();
+    StateLock const lock;
+    force_default_colors_ = forced;
 }
 
 void StadiumManager::SetEnabledCarColor(bool enable) const
@@ -137,6 +142,7 @@ bool StadiumManager::GetEnabledCarColor() const
 
 void StadiumManager::Render()
 {
+    StateLock const lock;
     if (!plugin_installed_)
     {
         DrawInstallGui();
