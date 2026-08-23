@@ -23,8 +23,14 @@ public:
 private:
     void OnNameChange(PriWrapper& pri);
     static void DoRename(PriWrapper pri, const std::string& new_name);
+    /// True while the replay is jumping through the timeline, and for a short settling
+    /// period afterwards. Renaming during that window crashes the game -- see the .cpp.
+    [[nodiscard]] bool IsSeekingTimeline(ReplayServerWrapper& replay);
 
     std::map<PriUid, PlayerNameOverride> name_cache_;
+    /// Replay frame seen on the previous nameplate update, -1 when we have no baseline yet.
+    int last_replay_frame_ = -1;
+    int seek_settle_frames_ = 0;
     bool enabled_ = true;
     std::shared_ptr<GameWrapper> gw_;
 };
