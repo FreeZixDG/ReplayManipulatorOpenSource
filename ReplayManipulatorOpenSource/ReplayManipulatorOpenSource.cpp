@@ -20,6 +20,7 @@
 #include "Features/MapChange/ReplayMapChanger.h"
 #include "Features/Names/PlayerRenamer.h"
 #include "Features/Names/PlayerTitleChanger.h"
+#include "Features/PlayerPresets/PlayerPresetManager.h"
 #include "Features/ReplayManager/ReplayManager.h"
 #include "Features/SlowMotionTransitionFixer/Stfu.h"
 #include "Features/StadiumColors/StadiumManager.h"
@@ -58,6 +59,9 @@ void ReplayManipulatorOpenSource::onLoad()
     loadout_editor_ = std::make_shared<LoadoutEditor>(items_, paint_finish_colors_, item_paints_);
 
     loadout_editor_->LoadProductIcons(gameWrapper->GetDataFolder() / "ReplayManipulatorOS" / "slots");
+
+    player_presets_ = std::make_shared<PlayerPresetManager>(
+        gameWrapper->GetDataFolder() / "ReplayManipulatorOS" / "player_configs", items_);
 
     gameWrapper->HookEventPost("Function TAGame.GameInfo_Replay_TA.HandleReplayImported", [this](...) {
         gameWrapper->HookEventPost("Function TAGame.GameInfo_Replay_TA.EventGameEventSet", [this](...) {
@@ -197,6 +201,38 @@ void ReplayManipulatorOpenSource::RenderSettings()
 
 void ReplayManipulatorOpenSource::DrawPriData(PriData& pri)
 {
+    if (ImGui::Button("Reset this player"))
+    {
+        ResetPlayer(pri);
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Reset all players"))
+    {
+        ResetAllPlayers();
+    }
+    ImGui::SameLine();
+    HelpMarker("Puts the loadout, name, title, camera and hidden state back the way the replay has them, "
+               "and stops applying the custom decal.\n\n"
+               "The plugin keeps your edits when you leave and reopen the same replay, so this is how you "
+               "start a player over without switching to another replay. It changes nothing on disk: your "
+               "saved configs are untouched.\n\n"
+               "A custom decal already drawn on a car only goes away once the game rebuilds the car mesh, "
+               "the same as picking \"None\" in the decal list below.");
+    ImGui::Separator();
+
+    if (player_presets_ && ImGui::CollapsingHeader("Saved player configs"))
+    {
+        ImGui::Indent();
+        // The capture has to happen every frame anyway: it is what the Save button stores, and
+        // it also tells the widgets which parts this player currently has something to store.
+        if (const auto request = player_presets_->DrawForPlayer(CapturePreset(pri)))
+        {
+            ApplyPreset(pri, request->preset, request->selection);
+        }
+        ImGui::Unindent();
+        ImGui::Separator();
+    }
+
     if (player_rename_)
     {
         static std::string new_name;
@@ -392,6 +428,164 @@ void ReplayManipulatorOpenSource::DrawPriData(PriData& pri)
     }
 }
 
+PlayerPreset ReplayManipulatorOpenSource::CapturePreset(const PriData& pri) const
+{
+    PlayerPreset preset;
+
+    preset.loadout = pri.loadout;
+    preset.custom_decal_name = pri.custom_decal.name;
+
+    // PriData::player_name is a snapshot taken shortly after the replay opened and never
+    // refreshed, so it still holds the original name after a rename. The renamer's own cache
+    // is the only place that knows what the player is actually called now.
+    preset.player_name = pri.player_name;
+    if (player_rename_)
+    {
+        if (auto renamed_to = player_rename_->GetOverriddenName(pri.uid); !renamed_to.empty())
+        {
+            preset.player_name = renamed_to;
+        }
+    }
+
+    // Before the game has replicated the camera there is nothing to store but zeroes, which
+    // would read back as a 0 FOV camera glued to the car.
+    if (camera_settings_ && camera_settings_->HasCameraOverride(pri.uid))
+    {
+        const auto camera_override = camera_settings_->GetCameraOverrideSettings(pri.uid);
+        preset.camera = CameraPreset{camera_override.enabled, camera_override.override_settings};
+    }
+
+    if (player_title_ && player_title_->IsUsable())
+    {
+        preset.title_id = player_title_->GetDisplayedTitleId(pri.uid);
+    }
+
+    return preset;
+}
+
+void ReplayManipulatorOpenSource::ApplyPreset(PriData& pri, const PlayerPreset& preset,
+                                              const PlayerPresetSelection& what)
+{
+    auto loadout_changed = false;
+
+    if (what.loadout && preset.loadout)
+    {
+        pri.loadout = *preset.loadout;
+        loadout_changed = true;
+    }
+
+    if (what.custom_decal && preset.custom_decal_name)
+    {
+        if (preset.custom_decal_name->empty())
+        {
+            pri.custom_decal = CustomTextures::default_decal_;
+        }
+        else
+        {
+            pri.custom_decal = FindCustomDecal(*preset.custom_decal_name);
+            // A custom decal only shows on the body and skin it was authored for. Same fix-up
+            // the decal combo below does when you pick one by hand.
+            if (pri.custom_decal.BodyID >= 0 && pri.custom_decal.SkinID >= 0)
+            {
+                auto& body = pri.loadout.items[pluginsdk::Equipslot::BODY];
+                body.slot = pluginsdk::Equipslot::BODY;
+                body.product_id = pri.custom_decal.BodyID;
+
+                auto& skin = pri.loadout.items[pluginsdk::Equipslot::DECAL];
+                skin.slot = pluginsdk::Equipslot::DECAL;
+                skin.product_id = pri.custom_decal.SkinID;
+            }
+        }
+        loadout_changed = true;
+    }
+
+    // One hop to the game thread for everything, because the order matters: the title lives in
+    // the loadout, so writing the loadout wipes it and it has to go last.
+    OnGameThread([this, pri_data = pri, preset, what, loadout_changed] {
+        auto pri_wrapper = GetPriWrapper(pri_data);
+        if (!pri_wrapper)
+        {
+            return;
+        }
+
+        if (loadout_changed)
+        {
+            UpdateLoadout(pri_data);
+        }
+
+        if (what.camera && preset.camera && camera_settings_)
+        {
+            camera_settings_->ApplyCameraOverride(pri_wrapper, preset.camera->enabled, preset.camera->settings);
+        }
+
+        if (what.player_name && preset.player_name && player_rename_)
+        {
+            if (preset.player_name->empty())
+            {
+                player_rename_->Restore(pri_wrapper);
+            }
+            else
+            {
+                player_rename_->Rename(pri_wrapper, *preset.player_name);
+            }
+        }
+
+        if (what.title && preset.title_id && player_title_ && player_title_->IsUsable())
+        {
+            player_title_->SetTitle(pri_wrapper, *preset.title_id);
+        }
+    });
+}
+
+void ReplayManipulatorOpenSource::ResetPlayer(PriData& pri)
+{
+    // The originals are the snapshot taken when the replay was first read, so they are the
+    // only record of what the replay itself holds. Without one there is no loadout to put back.
+    if (const auto* original = GetOriginalPriData(pri.uid))
+    {
+        pri.loadout = original->loadout;
+        pri.hidden = original->hidden;
+    }
+    // The SDK can apply a decal but not take one off, so all we can do is stop re-applying it.
+    // The car keeps showing it until the game rebuilds the mesh, exactly like picking "None".
+    pri.custom_decal = CustomTextures::default_decal_;
+
+    OnGameThread([this, pri_data = pri] {
+        auto pri_wrapper = GetPriWrapper(pri_data);
+        if (!pri_wrapper)
+        {
+            return;
+        }
+
+        UpdateLoadout(pri_data);
+        ApplyCarHiddenState(pri_data);
+
+        if (camera_settings_)
+        {
+            camera_settings_->ResetCameraOverride(pri_wrapper);
+        }
+        if (player_rename_)
+        {
+            player_rename_->Restore(pri_wrapper);
+        }
+        // The loadout carries the title, so restoring the loadout above wiped it. Title last.
+        if (player_title_)
+        {
+            player_title_->Restore(pri_wrapper);
+        }
+    });
+}
+
+void ReplayManipulatorOpenSource::ResetAllPlayers()
+{
+    // Only touches the fields of existing entries, so this is safe to call while RenderWindow
+    // is iterating replay_players_.
+    for (auto& player : replay_players_)
+    {
+        ResetPlayer(player);
+    }
+}
+
 void ReplayManipulatorOpenSource::RenderWindow()
 {
     ImGuiTabBarFlags constexpr tab_bar_flags = ImGuiTabBarFlags_None;
@@ -451,6 +645,19 @@ PriData* ReplayManipulatorOpenSource::GetPriData(PriWrapper& pri)
         return p == pri;
     });
     if (it != replay_players_.end())
+    {
+        return &(*it);
+    }
+
+    return nullptr;
+}
+
+const PriData* ReplayManipulatorOpenSource::GetOriginalPriData(const PriUid& uid) const
+{
+    const auto it = std::ranges::find_if(replay_players_originals_, [&uid](const PriData& p) {
+        return p.uid == uid;
+    });
+    if (it != replay_players_originals_.end())
     {
         return &(*it);
     }

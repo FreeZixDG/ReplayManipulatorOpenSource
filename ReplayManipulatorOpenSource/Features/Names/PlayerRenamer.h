@@ -18,6 +18,9 @@ public:
     void Restore(PriWrapper pri);
     void ResetNameOverrides();
     [[nodiscard]] bool IsInRenameCache(const PriUid& pri_id) const;
+    /// The name we renamed this player to, or empty if we never renamed them. Only reads
+    /// cached state, so it is safe to call from the render thread.
+    [[nodiscard]] std::string GetOverriddenName(const PriUid& pri_id) const;
     [[nodiscard]] bool CanRename() const;
 
 private:

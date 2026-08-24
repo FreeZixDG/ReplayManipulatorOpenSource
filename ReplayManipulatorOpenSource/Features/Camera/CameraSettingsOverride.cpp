@@ -53,6 +53,11 @@ CameraOverride CameraSettingsOverride::GetCameraOverrideSettings(const PriUid& i
     return {};
 }
 
+bool CameraSettingsOverride::HasCameraOverride(const PriUid& id) const
+{
+    return camera_overrides_.contains(id);
+}
+
 void CameraSettingsOverride::SetCameraOverrideSettings(const PriUid& id, const CameraOverride& camera_override_settings)
 {
     if (const auto it = camera_overrides_.find(id); it != camera_overrides_.end())
@@ -61,6 +66,32 @@ void CameraSettingsOverride::SetCameraOverrideSettings(const PriUid& id, const C
     }
 }
 
+
+void CameraSettingsOverride::ApplyCameraOverride(PriWrapper& pri, const bool enabled,
+                                                 const ProfileCameraSettings& settings)
+{
+    const auto id = PriUid(pri);
+    auto it = camera_overrides_.find(id);
+    if (it == camera_overrides_.end())
+    {
+        it = camera_overrides_.emplace(id, ReadOriginalSetting(pri)).first;
+    }
+    it->second.enabled = enabled;
+    it->second.override_settings = settings;
+    SetPriCameraSetting(pri, it->second.GetCameraSettings());
+}
+
+void CameraSettingsOverride::ResetCameraOverride(PriWrapper& pri)
+{
+    const auto it = camera_overrides_.find(PriUid(pri));
+    if (it == camera_overrides_.end())
+    {
+        return;
+    }
+    it->second.enabled = false;
+    it->second.override_settings = it->second.original_settings;
+    SetPriCameraSetting(pri, it->second.original_settings);
+}
 
 CameraOverride CameraSettingsOverride::ReadOriginalSetting(PriWrapper& pri)
 {

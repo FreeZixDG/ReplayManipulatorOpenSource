@@ -8,6 +8,7 @@
 - Rename any player in a replay
 - Change the player title shown for any player in a replay
 - Change player camera settings
+- Save a player's whole look (loadout, custom decal, camera, name, title) as a named config and put it back on any player in any replay in one click
 - Fixes issues with camera transitions when using slowmotion
 - View and open all your saved replays from the settings menu
 - Change maps (Thumbnail feature had to be dropped in the rewrite)

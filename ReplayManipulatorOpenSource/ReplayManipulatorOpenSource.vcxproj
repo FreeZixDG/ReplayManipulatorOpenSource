@@ -114,6 +114,8 @@
     <ClCompile Include="Framework\GuiFeatureBase.cpp" />
     <ClCompile Include="Features\Names\PlayerRenamer.cpp" />
     <ClCompile Include="Features\Names\PlayerTitleChanger.cpp" />
+    <ClCompile Include="Features\PlayerPresets\PlayerPreset.cpp" />
+    <ClCompile Include="Features\PlayerPresets\PlayerPresetManager.cpp" />
     <ClCompile Include="Features\ReplayManager\ReplayData.cpp" />
     <ClCompile Include="Features\ReplayManager\ReplayManager.cpp" />
     <ClCompile Include="Features\TextureCache.cpp" />
@@ -160,6 +162,8 @@
     <ClInclude Include="Framework\GuiFeatureBase.h" />
     <ClInclude Include="Features\Names\PlayerRenamer.h" />
     <ClInclude Include="Features\Names\PlayerTitleChanger.h" />
+    <ClInclude Include="Features\PlayerPresets\PlayerPreset.h" />
+    <ClInclude Include="Features\PlayerPresets\PlayerPresetManager.h" />
     <ClInclude Include="Features\ReplayManager\ReplayData.h" />
     <ClInclude Include="Features\ReplayManager\ReplayManager.h" />
     <ClInclude Include="Features\TextureCache.h" />

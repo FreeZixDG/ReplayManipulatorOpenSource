@@ -89,6 +89,16 @@ bool PlayerRenamer::IsInRenameCache(const PriUid& pri_id) const
 }
 
 
+std::string PlayerRenamer::GetOverriddenName(const PriUid& pri_id) const
+{
+    if (const auto p = name_cache_.find(pri_id); p != name_cache_.end())
+    {
+        return p->second.new_name;
+    }
+    return {};
+}
+
+
 void PlayerRenamer::ResetNameOverrides()
 {
     name_cache_.clear();

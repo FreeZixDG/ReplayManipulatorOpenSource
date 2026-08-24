@@ -11,6 +11,7 @@
 #include "Features/CamPathsManager/CamPathsManager.h"
 #include "Features/Credits/Credits.h"
 #include "Features/CustomTextures/CustomTextures.h"
+#include "Features/PlayerPresets/PlayerPreset.h"
 
 #include <memory>
 #include <bakkesmod/wrappers/GameObject/MeshComponents/CarMeshComponentBaseWrapper.h>
@@ -29,6 +30,7 @@ class CameraFocus;
 class LoadoutEditor;
 class Items;
 class ReplayManager;
+class PlayerPresetManager;
 
 // ReSharper disable once CppInconsistentNaming
 constexpr auto plugin_version = stringify(VERSION_MAJOR) "." stringify(VERSION_MINOR) "." stringify(VERSION_PATCH) "."
@@ -58,7 +60,19 @@ public:
 
     void DrawPriData(PriData& pri);
 
+    /// Everything a preset can hold, read off this player as they look right now.
+    [[nodiscard]] PlayerPreset CapturePreset(const PriData& pri) const;
+    /// Writes the ticked parts of `preset` onto `pri`. The parts that need the game get
+    /// queued on the game thread in one go, since their order matters.
+    void ApplyPreset(PriData& pri, const PlayerPreset& preset, const PlayerPresetSelection& what);
+
+    /// Puts this player back the way the replay has them, undoing every edit the plugin made.
+    void ResetPlayer(PriData& pri);
+    void ResetAllPlayers();
+
     [[nodiscard]] PriData* GetPriData(PriWrapper& pri);
+    /// The player as the replay first gave them to us, or null if we never snapshotted them.
+    [[nodiscard]] const PriData* GetOriginalPriData(const PriUid& uid) const;
     void OnPriLoadoutSet(PriWrapper& pri);
     void ApplyLoadoutOverrides(PriWrapper& pri);
     void RefreshPriData();
@@ -115,6 +129,7 @@ private:
     std::shared_ptr<PlayerRenamer> player_rename_;
     std::shared_ptr<PlayerTitleChanger> player_title_;
     std::shared_ptr<ReplayManager> replay_manager_;
+    std::shared_ptr<PlayerPresetManager> player_presets_;
     std::shared_ptr<TextureCache> texture_cache_;
     std::shared_ptr<CamPathsManager> dollycam_manager_;
     std::shared_ptr<CreditsInSettings> credits_;
